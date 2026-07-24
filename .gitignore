@@ -1,0 +1,3 @@
+# reaper output — contains local process history, never commit
+logs/
+*.log
