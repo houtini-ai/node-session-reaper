@@ -108,6 +108,13 @@ while ($cur -and $map.ContainsKey($cur)) { [void]$guard.Add($cur); $cur = [int]$
 # cannot match a user's own dev server (those cmdlines carry none of these).
 $sig = '(?i)\\MCP\\|/mcp/|npm-cache\\_npx|npx-cli\.js|@modelcontextprotocol|mcp-server|-mcp\b|chrome-devtools|\\dist\\index\.js|\\build\\cli\.js'
 
+# --- Deliberate long-running services -------------------------------------------
+# Started on purpose outside any Claude session (a Scheduled Task, a terminal), so
+# they are always "ownerless" yet must never be reaped. The seo-audit standing
+# dashboard (port 8788) matched $sig via its C:\MCP\ path and was killed on every
+# session start. Add a service's script path here to keep it alive.
+$keep = '(?i)\\seo-audit-mcp\\dist\\(dashboard|runner)\.js\b'
+
 $reap    = @{}   # pid -> proc, deduped
 $reasons = @{}   # pid -> why
 
@@ -117,6 +124,7 @@ if (-not $Zombies) {
     foreach ($p in $procs) {
         $id = [int]$p.ProcessId
         if ($protected.Contains($id) -or $guard.Contains($id)) { continue }
+        if ($p.CommandLine -and $p.CommandLine -match $keep) { continue }  # deliberate service
         switch ($p.Name) {
             'node.exe'   { if ($All -or ($p.CommandLine -and $p.CommandLine -match $sig)) { $reap[$id]=$p; $reasons[$id]='ownerless-node' } }
             'cmd.exe'    { if ($p.CommandLine -and $p.CommandLine -match $sig)             { $reap[$id]=$p; $reasons[$id]='ownerless-wrapper' } }
